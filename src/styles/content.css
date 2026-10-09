@@ -1,0 +1,99 @@
+/*
+ * Douyin ambient light - page styles.
+ *
+ * Everything is scoped to `html[data-dal="on"]`, an attribute the content script only adds
+ * while the effect is active. Removing the attribute (disabling the extension, navigating
+ * away, or an error) restores the page exactly as it was.
+ */
+
+/* ------------------------------------------------------------------ light layer */
+
+.dal-root {
+  position: fixed !important;
+  inset: 0 !important;
+  /* Behind every page box, above the canvas/page background. */
+  z-index: -1 !important;
+  display: block;
+  overflow: hidden !important;
+  pointer-events: none !important;
+  user-select: none !important;
+  background: var(--dal-bg, #0b0b10);
+}
+
+.dal-root[aria-hidden='true'] {
+  contain: layout style paint;
+}
+
+.dal-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+  /* The backing store is small on purpose; the composition filters live here so the final
+     softening is done by the compositor instead of by JavaScript. */
+  will-change: filter;
+}
+
+/* Sub pixel dithering: large, very soft gradients band badly on 8 bit displays. */
+.dal-noise {
+  position: absolute;
+  inset: 0;
+  display: block;
+  pointer-events: none;
+  background-repeat: repeat;
+  background-size: 128px 128px;
+  mix-blend-mode: overlay;
+}
+
+/* ------------------------------------------------------------------ transparent page */
+
+/*
+ * Page edits only happen in `background` mode, where the glow layer sits at z-index -1 and
+ * anything painting an opaque box above it hides the light. <html> then carries the
+ * background (painted before z-index -1 children) while <body> and the video ancestors are
+ * made transparent.
+ *
+ * The default `overlay` mode needs none of this: the layer is painted on top of the page
+ * with the video area punched out, so the host page is never modified. The
+ * `[data-dal-mode='background']` guard below is what keeps the page untouched by default.
+ */
+html[data-dal='on'][data-dal-mode='background'] {
+  background-color: var(--dal-bg, #0b0b10) !important;
+  background-image: none !important;
+}
+
+html[data-dal='on'][data-dal-mode='background'] > body {
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+html[data-dal='on'][data-dal-mode='background'] [data-dal-clear] {
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+/* Fullscreen: the browser paints a black backdrop behind the fullscreen element. */
+html[data-dal='on'][data-dal-mode='background'] :fullscreen,
+html[data-dal='on'][data-dal-mode='background'] :-webkit-full-screen {
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+/* ------------------------------------------------------- overlay (force visible) mode */
+
+/*
+ * Belt and braces: the layer is positioned with inline `!important` declarations from the
+ * content script (inline wins over every stylesheet), and these rules only describe the
+ * same contract for readers of this file.
+ */
+.dal-root--overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2147483000 !important;
+  pointer-events: none !important;
+  /* Painted above the page: no backdrop of its own, or the whole UI would be hidden. */
+  background: transparent !important;
+}

@@ -1,0 +1,9 @@
+# Keep the repository normalised: LF in git, whatever the working copy uses.
+* text=auto
+
+# Binary assets are never converted.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.ico binary

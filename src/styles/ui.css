@@ -1,0 +1,505 @@
+/*
+ * Shared chrome for the popup and the options page.
+ * Dark, low contrast palette so the settings screens do not fight with the glow preview.
+ */
+
+:root {
+  color-scheme: dark;
+  --dal-bg: #0d0e12;
+  --dal-panel: #15161c;
+  --dal-panel-2: #1c1e26;
+  --dal-line: #2a2c36;
+  --dal-text: #eceef4;
+  --dal-text-dim: #9aa0b0;
+  --dal-accent: #57b6ff;
+  --dal-accent-2: #9d7bff;
+  --dal-radius: 12px;
+  --dal-font: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", "Noto Sans SC", Roboto, Helvetica, Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--dal-font);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--dal-text);
+  background: var(--dal-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--dal-accent);
+}
+
+/* ------------------------------------------------------------------ layout */
+
+.dal-page {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 28px 24px 64px;
+}
+
+.dal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.dal-title {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 650;
+  letter-spacing: 0.2px;
+}
+
+.dal-subtitle {
+  margin: 4px 0 0;
+  color: var(--dal-text-dim);
+  font-size: 12px;
+}
+
+.dal-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 20px;
+  align-items: start;
+}
+
+.dal-grid--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (max-width: 880px) {
+  .dal-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.dal-card {
+  background: var(--dal-panel);
+  border: 1px solid var(--dal-line);
+  border-radius: var(--dal-radius);
+  padding: 16px 18px;
+}
+
+.dal-card + .dal-card {
+  margin-top: 16px;
+}
+
+.dal-card-title {
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dal-text);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.dal-card-title small {
+  font-weight: 400;
+  color: var(--dal-text-dim);
+}
+
+/* ------------------------------------------------------------------ preview */
+
+.dal-preview {
+  position: relative;
+  isolation: isolate;
+  height: 330px;
+  overflow: hidden;
+  border-radius: var(--dal-radius);
+  border: 1px solid var(--dal-line);
+  background: #14151a;
+}
+
+.dal-preview-stage {
+  position: absolute;
+  inset: 0;
+}
+
+.dal-preview-player {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 246px;
+  height: 138px;
+  transform: translate(-50%, -50%);
+  border-radius: 8px;
+  overflow: hidden;
+  z-index: 1;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.dal-preview-player canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.dal-preview-badge {
+  position: absolute;
+  left: 10px;
+  bottom: 8px;
+  z-index: 2;
+  font-size: 11px;
+  letter-spacing: 0.4px;
+  color: rgba(255, 255, 255, 0.82);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+}
+
+.dal-preview-hint {
+  margin: 10px 0 0;
+  font-size: 11.5px;
+  color: var(--dal-text-dim);
+}
+
+/* ------------------------------------------------------------------ fields */
+
+.dal-field {
+  padding: 9px 0;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.06);
+}
+
+.dal-field:last-child {
+  border-bottom: none;
+}
+
+.dal-field-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.dal-field-head label {
+  font-size: 12.5px;
+  font-weight: 550;
+}
+
+.dal-field-value {
+  font-variant-numeric: tabular-nums;
+  font-size: 11.5px;
+  color: var(--dal-accent);
+  min-width: 44px;
+  text-align: right;
+}
+
+.dal-field-hint {
+  margin: 5px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--dal-text-dim);
+}
+
+.dal-input[type="range"] {
+  width: 100%;
+  margin: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 20px;
+  background: transparent;
+}
+
+.dal-input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(87, 182, 255, 0.9), rgba(157, 123, 255, 0.65), rgba(255, 255, 255, 0.14));
+}
+
+.dal-input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  margin-top: -6px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #f4f6fb;
+  border: 2px solid var(--dal-accent);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.55);
+  cursor: pointer;
+}
+
+.dal-input[type="range"]:focus-visible::-webkit-slider-thumb {
+  outline: 2px solid var(--dal-accent);
+  outline-offset: 2px;
+}
+
+select.dal-input,
+input.dal-input[type="color"] {
+  width: 100%;
+  background: var(--dal-panel-2);
+  color: var(--dal-text);
+  border: 1px solid var(--dal-line);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-family: inherit;
+  font-size: 12.5px;
+}
+
+input.dal-input[type="color"] {
+  height: 34px;
+  padding: 3px;
+  cursor: pointer;
+}
+
+/* switch */
+
+.dal-switch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.dal-switch input {
+  /* Visually hidden but still focusable and clickable through the label. */
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.dal-switch-track {
+  flex: none;
+  width: 38px;
+  height: 21px;
+  border-radius: 999px;
+  background: #2b2d38;
+  border: 1px solid var(--dal-line);
+  transition: background 140ms ease;
+  display: flex;
+  align-items: center;
+  padding: 2px;
+}
+
+.dal-switch-thumb {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #cfd3de;
+  transition: transform 140ms ease, background 140ms ease;
+}
+
+.dal-switch input:checked + .dal-switch-track {
+  background: linear-gradient(90deg, var(--dal-accent), var(--dal-accent-2));
+}
+
+.dal-switch input:checked + .dal-switch-track .dal-switch-thumb {
+  transform: translateX(17px);
+  background: #fff;
+}
+
+.dal-switch input:focus-visible + .dal-switch-track {
+  outline: 2px solid var(--dal-accent);
+  outline-offset: 2px;
+}
+
+.dal-switch-label {
+  font-size: 12.5px;
+  font-weight: 550;
+}
+
+/* ------------------------------------------------------------------ buttons */
+
+.dal-btn {
+  appearance: none;
+  border: 1px solid var(--dal-line);
+  background: var(--dal-panel-2);
+  color: var(--dal-text);
+  border-radius: 9px;
+  padding: 7px 12px;
+  font-family: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+
+.dal-btn:hover {
+  background: #23252f;
+  border-color: #3a3d4a;
+}
+
+.dal-btn--primary {
+  background: linear-gradient(90deg, rgba(87, 182, 255, 0.22), rgba(157, 123, 255, 0.22));
+  border-color: rgba(87, 182, 255, 0.55);
+}
+
+.dal-btn--ghost {
+  background: transparent;
+}
+
+.dal-btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dal-presets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.dal-preset {
+  text-align: left;
+  border: 1px solid var(--dal-line);
+  background: var(--dal-panel-2);
+  border-radius: 10px;
+  padding: 9px 10px;
+  cursor: pointer;
+  color: var(--dal-text);
+  font-family: inherit;
+}
+
+.dal-preset:hover {
+  border-color: rgba(87, 182, 255, 0.5);
+}
+
+.dal-preset b {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.dal-preset span {
+  display: block;
+  font-size: 11px;
+  color: var(--dal-text-dim);
+  margin-top: 2px;
+}
+
+/* ------------------------------------------------------------------ status */
+
+.dal-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dal-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--dal-line);
+  background: var(--dal-panel-2);
+  color: var(--dal-text-dim);
+}
+
+.dal-chip b {
+  color: var(--dal-text);
+  font-weight: 600;
+}
+
+.dal-chip--on {
+  border-color: rgba(87, 182, 255, 0.45);
+  color: #cfe8ff;
+}
+
+.dal-chip--warn {
+  border-color: rgba(255, 176, 87, 0.45);
+  color: #ffe0bb;
+}
+
+/* Diagnostics list: label / value pairs, monospaced values so numbers line up. */
+.dal-diag {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 5px 14px;
+  margin: 0;
+  font-size: 12px;
+}
+
+.dal-diag dt {
+  color: var(--dal-text-dim);
+  white-space: nowrap;
+}
+
+.dal-diag dd {
+  margin: 0;
+  min-width: 0;
+  color: var(--dal-text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  overflow-wrap: anywhere;
+}
+
+.dal-diag .dal-ok {
+  color: #6fd08c;
+}
+
+.dal-diag .dal-warn {
+  color: #ffb347;
+}
+
+.dal-diag .dal-bad {
+  color: #ff7b7b;
+}
+
+.dal-swatch {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  border: 1px solid var(--dal-line);
+  vertical-align: -1px;
+  margin-right: 6px;
+}
+
+.dal-note {
+  font-size: 11.5px;
+  color: var(--dal-text-dim);
+  margin: 10px 0 0;
+}
+
+.dal-note strong {
+  color: var(--dal-text);
+}
+
+/* ------------------------------------------------------------------ popup */
+
+.dal-popup {
+  width: 344px;
+  padding: 14px 14px 12px;
+}
+
+.dal-popup .dal-card {
+  padding: 12px 13px;
+}
+
+.dal-popup .dal-field {
+  padding: 7px 0;
+}
+
+.dal-popup-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.dal-kbd {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px;
+  border: 1px solid var(--dal-line);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  padding: 1px 5px;
+  color: var(--dal-text-dim);
+}

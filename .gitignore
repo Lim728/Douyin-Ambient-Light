@@ -1,0 +1,33 @@
+# ---------------------------------------------------------------- dependencies
+node_modules/
+
+# ---------------------------------------------------------------- build output
+dist/
+*.tsbuildinfo
+
+# ---------------------------------------------------------------- caches & logs
+.vite/
+coverage/
+.eslintcache
+*.log
+npm-debug.log*
+
+# ---------------------------------------------------------------- local secrets
+# Never commit real credentials. `.env.example` (if one is ever added) stays tracked.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+
+# ---------------------------------------------------------------- editor & OS
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp
+*~

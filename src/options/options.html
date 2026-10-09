@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>抖音氛围光 · 设置</title>
+    <link rel="stylesheet" href="ui.css" />
+  </head>
+  <body>
+    <div class="dal-page">
+      <header class="dal-header">
+        <div>
+          <h1 class="dal-title">抖音氛围光 · Douyin Ambient Light</h1>
+          <p class="dal-subtitle">
+            为 https://www.douyin.com/ 的视频添加影院级动态环境光。所有画面分析都在本机浏览器内完成。
+          </p>
+        </div>
+        <div class="dal-btn-row">
+          <button class="dal-btn" id="dal-reset" type="button">恢复默认</button>
+        </div>
+      </header>
+
+      <div class="dal-grid">
+        <section>
+          <div class="dal-card">
+            <h2 class="dal-card-title">效果预览 <small id="dal-preview-scene">—</small></h2>
+            <div class="dal-preview" id="dal-preview">
+              <div class="dal-preview-stage" id="dal-preview-stage">
+                <div class="dal-preview-player">
+                  <canvas id="dal-preview-canvas" width="480" height="270"></canvas>
+                </div>
+              </div>
+            </div>
+            <p class="dal-preview-hint">
+              预览使用与扩展完全相同的取色与渲染代码，场景会每 6 秒切换一次，用来观察颜色过渡是否平滑。
+            </p>
+          </div>
+
+          <div class="dal-card">
+            <h2 class="dal-card-title">当前状态 · Diagnostics <small id="dal-status-updated">—</small></h2>
+            <dl class="dal-diag" id="dal-status"></dl>
+            <div class="dal-btn-row">
+              <button class="dal-btn" id="dal-test-red" type="button">测试红色光晕</button>
+              <button class="dal-btn" id="dal-test-blue" type="button">测试蓝色光晕</button>
+              <button class="dal-btn" id="dal-test-off" type="button">结束测试</button>
+              <button class="dal-btn dal-btn--primary" id="dal-open-douyin" type="button">打开抖音并测试</button>
+            </div>
+            <p class="dal-note" id="dal-status-hint">
+              「测试红色 / 蓝色光晕」会打开调试模式：不读取视频像素，直接用固定颜色绘制光晕。
+              如果抖音页面上能看到红 / 蓝色光晕，说明渲染图层正常，问题只会在取色环节。
+            </p>
+            <p class="dal-note" id="dal-storage-note"></p>
+          </div>
+
+          <div class="dal-card">
+            <h2 class="dal-card-title">快速预设</h2>
+            <div class="dal-presets" id="dal-presets"></div>
+            <p class="dal-note">
+              预设只会写入对应参数，不会改变总开关。「影院」是默认推荐的平衡点。
+            </p>
+          </div>
+        </section>
+
+        <section>
+          <div class="dal-card">
+            <h2 class="dal-card-title">参数</h2>
+            <div id="dal-settings"></div>
+          </div>
+          <div class="dal-card">
+            <h2 class="dal-card-title">隐私</h2>
+            <p class="dal-note">
+              视频画面仅在本地浏览器中用于颜色分析，不上传视频内容。扩展不包含任何统计、埋点或广告代码，
+              也不申请 <strong>storage</strong> 之外的任何权限。
+            </p>
+          </div>
+        </section>
+      </div>
+    </div>
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

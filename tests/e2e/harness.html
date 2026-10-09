@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>Douyin feed harness</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #161823;
+        color: #fff;
+        font: 13px/1.5 system-ui, sans-serif;
+      }
+      #root {
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .feed-card {
+        position: relative;
+        width: 380px;
+        height: 640px;
+        background: #000;
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      .feed-card--ghost {
+        /* Off screen second player: the detector must ignore it (visible area = 0). */
+        position: fixed;
+        left: -9999px;
+        top: 0;
+        width: 240px;
+        height: 240px;
+      }
+      .xgplayer {
+        width: 100%;
+        height: 100%;
+        background: #000;
+      }
+      video {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
+    </style>
+  </head>
+  <body>
+    <!--
+      Structural stand-in for a Douyin feed card. It reproduces the stable markers the
+      extension relies on (`data-e2e="feed-active-video"`, `.xgplayer`, a nested <video>)
+      and drives the video from a MediaStream so the frame content is fully controlled.
+
+      NOTE: this file is only used by the Playwright end to end test; it is not shipped.
+    -->
+    <div id="root">
+      <div class="feed-card" data-e2e="feed-active-video">
+        <div class="xgplayer">
+          <video id="player" playsinline autoplay muted></video>
+        </div>
+      </div>
+    </div>
+
+    <!-- Second player, off screen: exercises "several <video> elements exist at once". -->
+    <div class="feed-card feed-card--ghost" data-e2e="feed-video">
+      <div class="xgplayer"><video id="ghost" playsinline muted></video></div>
+    </div>
+
+    <script>
+      const scene = document.createElement('canvas');
+      scene.width = 480;
+      scene.height = 270;
+      const sceneCtx = scene.getContext('2d');
+      let color = '#1b6bff';
+      let accent = '#7fbcff';
+      /** When set, the scene is painted as a 3x3 grid of flat colours instead of a gradient. */
+      let zoneMap = null;
+
+      const ZONE_KEYS = ['tl', 'tc', 'tr', 'ml', 'mc', 'mr', 'bl', 'bc', 'br'];
+
+      function paintZones() {
+        const cw = scene.width / 3;
+        const ch = scene.height / 3;
+        sceneCtx.globalCompositeOperation = 'source-over';
+        for (let row = 0; row < 3; row++) {
+          for (let col = 0; col < 3; col++) {
+            sceneCtx.fillStyle = zoneMap[ZONE_KEYS[row * 3 + col]] ?? '#000000';
+            sceneCtx.fillRect(col * cw, row * ch, cw, ch);
+          }
+        }
+      }
+
+      function paint() {
+        if (zoneMap) {
+          paintZones();
+          return;
+        }
+        sceneCtx.fillStyle = color;
+        sceneCtx.fillRect(0, 0, scene.width, scene.height);
+        const cx = scene.width / 2;
+        const cy = scene.height / 2;
+        const g = sceneCtx.createRadialGradient(cx, cy, 10, cx, cy, Math.min(scene.width, scene.height) * 0.75);
+        g.addColorStop(0, accent);
+        g.addColorStop(1, 'rgba(0,0,0,0)');
+        sceneCtx.fillStyle = g;
+        sceneCtx.fillRect(0, 0, scene.width, scene.height);
+      }
+      paint();
+
+      const player = document.getElementById('player');
+      player.srcObject = scene.captureStream(30);
+      player.play().catch(() => {});
+
+      // The off screen player paints a distinct colour so the test can prove that the
+      // extension followed the visible one instead.
+      const ghostScene = document.createElement('canvas');
+      ghostScene.width = 240;
+      ghostScene.height = 240;
+      const ghostCtx = ghostScene.getContext('2d');
+      ghostCtx.fillStyle = '#0fbf4a';
+      ghostCtx.fillRect(0, 0, 240, 240);
+
+      const ghost = document.getElementById('ghost');
+      ghost.srcObject = ghostScene.captureStream(30);
+      ghost.play().catch(() => {});
+
+      // Keeps the stream alive so the video always has fresh frames.
+      let ticker = 0;
+      setInterval(() => {
+        ticker += 1;
+        paint();
+        void ticker;
+      }, 100);
+
+      window.__harness = {
+        setColor(next, nextAccent) {
+          zoneMap = null;
+          color = next;
+          accent = nextAccent ?? next;
+          paint();
+        },
+        /**
+         * Paints an exact 3x3 grid of flat colours (tl/tc/tr/ml/mc/mr/bl/bc/br). Used to prove
+         * that the ambient light is spatially independent: a zone that is black stays black.
+         */
+        setZones(map) {
+          zoneMap = { ...map };
+          paint();
+        },
+        /**
+         * Simulates Douyin switching the video quality: the *media* resolution changes while the
+         * element, the DOM around it and the playing state all stay the same. A fresh stream is
+         * handed to the player because a running captureStream does not always renegotiate its
+         * frame size.
+         */
+        setResolution(width, height) {
+          scene.width = width;
+          scene.height = height;
+          paint();
+          player.srcObject = scene.captureStream(30);
+          player.play().catch(() => {});
+          return { width, height };
+        },
+        /** Current media resolution as the extension sees it. */
+        resolution() {
+          return { width: player.videoWidth, height: player.videoHeight, buffer: `${scene.width}x${scene.height}` };
+        },
+        player,
+        /** Replaces the whole card, mimicking Douyin's destroy + recreate cycle. */
+        remount() {
+          const root = document.getElementById('root');
+          root.innerHTML =
+            '<div class="feed-card" data-e2e="feed-active-video"><div class="xgplayer"><video id="player" playsinline autoplay muted></video></div></div>';
+          const next = document.getElementById('player');
+          next.srcObject = scene.captureStream(30);
+          next.play().catch(() => {});
+          window.__harness.player = next;
+          return true;
+        },
+        /** Removes every player from the page, like Douyin leaving the feed entirely. */
+        unmount() {
+          document.getElementById('root').innerHTML = '';
+          document.getElementById('ghost')?.closest('.feed-card')?.remove();
+          return true;
+        },
+      };
+    </script>
+  </body>
+</html>

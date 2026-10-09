@@ -1,0 +1,57 @@
+{
+  "manifest_version": 3,
+  "name": "抖音氛围光 · Douyin Ambient Light",
+  "short_name": "抖音氛围光",
+  "version": "1.0.0",
+  "description": "为抖音网页版（douyin.com）视频添加影院级动态氛围光。画面仅在本机浏览器内取色，不上传任何数据。",
+  "minimum_chrome_version": "111",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_title": "抖音氛围光",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": ["storage"],
+  "host_permissions": ["https://www.douyin.com/*", "https://live.douyin.com/*"],
+  "commands": {
+    "toggle-ambient-light": {
+      "suggested_key": {
+        "default": "Alt+Shift+A"
+      },
+      "description": "开启 / 关闭抖音氛围光"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.douyin.com/*", "https://live.douyin.com/*"],
+      "js": ["cors-patcher.js"],
+      "run_at": "document_start",
+      "world": "MAIN",
+      "all_frames": false
+    },
+    {
+      "matches": ["https://www.douyin.com/*", "https://live.douyin.com/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ]
+}
