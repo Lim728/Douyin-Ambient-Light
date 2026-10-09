@@ -413,15 +413,14 @@ access-control-allow-headers: range
 | --- | --- | --- |
 | [WesselKroos/youtube-ambilight](https://github.com/WesselKroos/youtube-ambilight) | MIT（LICENSE 文件为 MIT；`package.json` 写的是 ISC） | **参考核心算法**：低分辨率画布 → 多层向外投影 → 整体模糊；线性光混合 |
 | [Miruko2/bilibili-ambient-light](https://github.com/Miruko2/bilibili-ambient-light) | MIT | **参考实现思路**：`z-index: -1` 光晕层 + 祖先透明；黑边检测；暂停/隐藏停止采样 |
-| [iceorange-dev/bilibili-ambilight](https://github.com/iceorange-dev/bilibili-ambilight) | MIT（youtube-ambilight 的 B 站移植） | 代码体量大、与 YouTube DOM 深度耦合，不适合直接复用（未使用其代码） |
-| [isxlan0/DouYinPlus](https://github.com/isxlan0/DouYinPlus) | MIT | 仅用于确认抖音页面标记 `data-e2e="feed-active-video"` / `.xgplayer` / `#sliderVideo` 长期稳定存在（未使用其代码） |
-| [pansoul1/douyin-web-enhancer](https://github.com/pansoul1/douyin-web-enhancer) | MIT | 同上，另外确认了 `.xgplayer-playswitch`（未使用其代码） |
+| [iceorange-dev/bilibili-ambilight](https://github.com/iceorange-dev/bilibili-ambilight) | MIT（youtube-ambilight 的 B 站移植） | 代码体量大、与 YouTube DOM 深度耦合，不适合直接复用 |
+| [isxlan0/DouYinPlus](https://github.com/isxlan0/DouYinPlus) | MIT | 用于确认抖音页面标记 `data-e2e="feed-active-video"` / `.xgplayer` / `#sliderVideo` 长期稳定存在 |
+| [pansoul1/douyin-web-enhancer](https://github.com/pansoul1/douyin-web-enhancer) | MIT | 同上，另外确认了 `.xgplayer-playswitch` |
 | npm 上的 `ambient-light*` 包 | — | 均为 OS 光线传感器 / VR 光照，与本需求无关 |
 
-**本项目是针对抖音独立编写的实现**：上面这些项目只作为算法思路与页面结构的参考，没有把它们的
-代码整体移植或逐行复制进本项目 —— 上游的 WebGL 投影器、YouTube / B 站专用 DOM 逻辑、Sentry
-上报等都无法用于抖音。本项目自行实现了取色、平滑与渲染，并针对抖音重写了视频检测、SPA 调度、
-CORS 兼容与页面样式方案。
+上面这些项目在本项目里只作为**算法思路与页面结构**的参考：本项目的取色、平滑、渲染、视频
+检测、SPA 调度、CORS 兼容与页面样式方案都是为抖音重新编写的，上游的 WebGL 投影器、
+YouTube / B 站专用 DOM 逻辑、Sentry 上报等都无法直接用于抖音。
 
 按 MIT 许可要求，相关版权与许可声明保留在 [`THIRD-PARTY-NOTICES.md`](./THIRD-PARTY-NOTICES.md)。
 本项目自身以 **MIT 许可证**发布，版权归 **Lim728**，完整许可证文本见 [`LICENSE`](./LICENSE)；
