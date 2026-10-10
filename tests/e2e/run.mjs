@@ -581,6 +581,54 @@ async function main() {
       JSON.stringify(matchedTabs)
     );
 
+    // ------------------------------------------------------ pure black background toggle
+    const pureBlackField = await popup.evaluate(() => {
+      const field = document.querySelector('[data-key="pureBlackBackground"]');
+      const input = field?.querySelector('input[type="checkbox"]');
+      return {
+        present: Boolean(field),
+        label: (field?.textContent ?? '').replace(/\s+/g, ' ').trim(),
+        checked: input?.checked ?? null,
+      };
+    });
+    check(
+      'popup exposes the pure black background toggle (off by default)',
+      pureBlackField.present && pureBlackField.checked === false && pureBlackField.label.includes('纯黑背景'),
+      JSON.stringify(pureBlackField)
+    );
+
+    await popup.click('[data-key="pureBlackBackground"] .dal-switch-track');
+    await sleep(700);
+    const pureBlackStored = await popup.evaluate(
+      async () => (await chrome.storage.sync.get('settings')).settings?.pureBlackBackground
+    );
+    check('the popup toggle saves the pure black choice', pureBlackStored === true, String(pureBlackStored));
+
+    await sleep(1200);
+    const inkWhileOn = await page.evaluate(() => ({
+      marker: document.documentElement.getAttribute('data-dal-black'),
+      inked: document.querySelectorAll('[data-dal-ink]').length,
+      html: getComputedStyle(document.documentElement).backgroundColor,
+    }));
+    check(
+      'the popup toggle actually reaches the page (background turns black)',
+      inkWhileOn.marker === '1' && inkWhileOn.inked >= 3 && inkWhileOn.html === 'rgb(0, 0, 0)',
+      JSON.stringify(inkWhileOn)
+    );
+
+    await popup.click('[data-key="pureBlackBackground"] .dal-switch-track');
+    await sleep(1400);
+    const inkAfterOff = await page.evaluate(() => ({
+      marker: document.documentElement.getAttribute('data-dal-black'),
+      inked: document.querySelectorAll('[data-dal-ink]').length,
+      html: getComputedStyle(document.documentElement).backgroundColor,
+    }));
+    check(
+      'turning the popup toggle off restores the page background',
+      inkAfterOff.marker === null && inkAfterOff.inked === 0 && inkAfterOff.html === 'rgb(22, 24, 35)',
+      JSON.stringify(inkAfterOff)
+    );
+
     // ------------------------------------------------------- debug / force mode
     const setSettings = (patch) =>
       popup.evaluate(async (next) => {
@@ -608,6 +656,114 @@ async function main() {
 
     await setSettings({ debugForce: false });
     await sleep(1500);
+
+    // ---------------------------------------------------------- pure black background
+    // This is the only option that writes to the page's *own* backgrounds, so it gets a full
+    // round trip on the real page: on -> the wall behind the player is #000; off -> the page's
+    // original value comes back (not transparent, not white) and an unrelated element is
+    // never touched.
+    await page.evaluate(() => {
+      if (document.getElementById('dal-unrelated')) return;
+      const node = document.createElement('div');
+      node.id = 'dal-unrelated';
+      node.style.background = 'rgb(255, 0, 0)';
+      node.style.width = '12px';
+      node.style.height = '12px';
+      document.body.append(node);
+    });
+    const beforeBlack = await page.evaluate(() => ({
+      html: getComputedStyle(document.documentElement).backgroundColor,
+      rootInline: document.querySelector('#root').style.getPropertyValue('background-color'),
+    }));
+
+    await setSettings({ pureBlackBackground: true });
+    await sleep(1800);
+    const blackOn = await page.evaluate(() => {
+      const inked = Array.from(document.querySelectorAll('[data-dal-ink]'));
+      const root = document.querySelector('#root');
+      const status = JSON.parse(document.documentElement.getAttribute('data-dal-status') ?? '{}');
+      return {
+        marker: document.documentElement.getAttribute('data-dal-black'),
+        inked: inked.length,
+        connected: inked.every((node) => node.isConnected),
+        html: getComputedStyle(document.documentElement).backgroundColor,
+        root: getComputedStyle(root).backgroundColor,
+        rootPriority: root.style.getPropertyPriority('background-color'),
+        videoUntouched: document.querySelector('#player').style.getPropertyValue('background-color'),
+        unrelated: getComputedStyle(document.getElementById('dal-unrelated')).backgroundColor,
+        black: status.black ?? 0,
+      };
+    });
+    check(
+      'pure black: the background behind the player turns solid black',
+      blackOn.marker === '1' &&
+        blackOn.html === 'rgb(0, 0, 0)' &&
+        blackOn.root === 'rgb(0, 0, 0)' &&
+        blackOn.rootPriority === 'important',
+      JSON.stringify({ marker: blackOn.marker, html: blackOn.html, root: blackOn.root })
+    );
+    check(
+      'pure black: only the video chain is inked and it is reported in the status',
+      blackOn.inked >= 4 && blackOn.connected && blackOn.black >= 4,
+      JSON.stringify({ inked: blackOn.inked, black: blackOn.black })
+    );
+    check(
+      'pure black: the <video> and unrelated elements keep their own background',
+      blackOn.videoUntouched === '' && blackOn.unrelated === 'rgb(255, 0, 0)',
+      JSON.stringify({ video: blackOn.videoUntouched, unrelated: blackOn.unrelated })
+    );
+
+    // SPA / player swap: the old chain is restored, the new one is inked, no residue.
+    await page.evaluate(() => window.__harness.remount());
+    await sleep(1800);
+    const blackAfterRemount = await page.evaluate(() => {
+      const inked = Array.from(document.querySelectorAll('[data-dal-ink]'));
+      return {
+        inked: inked.length,
+        connected: inked.every((node) => node.isConnected),
+        cardInked: Boolean(document.querySelector('.feed-card[data-dal-ink]')),
+        root: getComputedStyle(document.querySelector('#root')).backgroundColor,
+      };
+    });
+    check(
+      'pure black: survives a recreated player without leftover markers',
+      blackAfterRemount.connected &&
+        blackAfterRemount.cardInked &&
+        blackAfterRemount.inked >= 3 &&
+        blackAfterRemount.root === 'rgb(0, 0, 0)',
+      JSON.stringify(blackAfterRemount)
+    );
+
+    await setSettings({ pureBlackBackground: false });
+    await sleep(1800);
+    const blackOff = await page.evaluate(() => {
+      const status = JSON.parse(document.documentElement.getAttribute('data-dal-status') ?? '{}');
+      return {
+        marker: document.documentElement.getAttribute('data-dal-black'),
+        inked: document.querySelectorAll('[data-dal-ink]').length,
+        html: getComputedStyle(document.documentElement).backgroundColor,
+        htmlPriority: document.documentElement.style.getPropertyPriority('background-color'),
+        rootInline: document.querySelector('#root').style.getPropertyValue('background-color'),
+        unrelated: getComputedStyle(document.getElementById('dal-unrelated')).backgroundColor,
+        dal: document.documentElement.getAttribute('data-dal'),
+        renderer: status.renderer,
+      };
+    });
+    check(
+      'pure black: switching off restores the original page background',
+      blackOff.marker === null &&
+        blackOff.inked === 0 &&
+        blackOff.html === beforeBlack.html &&
+        blackOff.htmlPriority === '' &&
+        blackOff.rootInline === beforeBlack.rootInline,
+      JSON.stringify({ html: blackOff.html, before: beforeBlack.html, rootInline: blackOff.rootInline })
+    );
+    check(
+      'pure black: switching off does not disable the ambient light',
+      blackOff.dal === 'on' && blackOff.renderer === 'active' && blackOff.unrelated === 'rgb(255, 0, 0)',
+      JSON.stringify({ dal: blackOff.dal, renderer: blackOff.renderer })
+    );
+    await page.evaluate(() => document.getElementById('dal-unrelated')?.remove());
 
     // ---------------------------------------------------------------- disable
     await popup.click('[data-key="enabled"] .dal-switch-track');

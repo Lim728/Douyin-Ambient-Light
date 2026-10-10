@@ -1,6 +1,6 @@
 /**
- * Popup: the four controls people change most often, plus a status line and a shortcut to
- * the full options page. It talks to the content script through `chrome.tabs.sendMessage`
+ * Popup: the handful of controls people change most often, plus a status line and a shortcut
+ * to the full options page. It talks to the content script through `chrome.tabs.sendMessage`
  * and falls back to storage-only editing when no Douyin tab is open.
  */
 
@@ -18,6 +18,7 @@ const POPUP_KEYS = new Set([
   'smoothness',
   'samplingFps',
   'fullPageBackground',
+  'pureBlackBackground',
 ]);
 
 async function main() {

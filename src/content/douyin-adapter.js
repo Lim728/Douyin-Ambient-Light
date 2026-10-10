@@ -38,6 +38,30 @@ const MARKER_ATTRIBUTE = 'data-dal-status';
 /** Elements whose background must stay opaque even if they are an ancestor of the video. */
 const KEEP_OPAQUE = 'input,textarea,select,button,[role="dialog"]';
 
+/** Marks an element whose background was darkened by the "pure black background" option. */
+const INK_ATTRIBUTE = 'data-dal-ink';
+/** Root marker published while the pure black background option is active (diagnostics). */
+const BLACK_ATTRIBUTE = 'data-dal-black';
+
+/** The exact colour written by the pure black option. */
+const BLACK = '#000000';
+/**
+ * Every serialisation of "black" a browser may hand back for the value we wrote. Used on
+ * restore to tell *our* override apart from a value the page wrote itself.
+ */
+const BLACK_VALUES = new Set(['#000', '#000000', 'black', 'rgb(0,0,0)', 'rgba(0,0,0,1)']);
+
+/**
+ * True only while `property` still carries the exact `!important` black that
+ * `darkenElement` wrote. If the page replaced it in the meantime the extension must not
+ * clobber that newer value with a stale snapshot.
+ */
+function holdsOwnedBlack(element, property) {
+  if (element.style.getPropertyPriority(property) !== 'important') return false;
+  const value = element.style.getPropertyValue(property).replace(/\s+/g, '').toLowerCase();
+  return property === 'background-image' ? value === 'none' : BLACK_VALUES.has(value);
+}
+
 export class DouyinAmbientAdapter {
   constructor(dependencies) {
     this.controller = dependencies.controller;
@@ -52,6 +76,11 @@ export class DouyinAmbientAdapter {
     this.container = null;
     this.videoCount = 0;
     this.clearedElements = new Set();
+    /**
+     * `data-dal-ink` elements and the inline declarations they had before the pure black
+     * option darkened them: `Map<Element, Map<property, { value, priority }>>`.
+     */
+    this.inkedElements = new Map();
     this.pageActive = false;
     this.mutationObserver = null;
     this.resizeObserver = null;
@@ -171,8 +200,11 @@ export class DouyinAmbientAdapter {
       this.container = video ? findContainer(video) : null;
       this.controller.setVideo(video);
       this.observeContainer();
-      this.markAncestors();
     }
+    // Re-run on every pass (not only when the video changes): Douyin reshuffles its wrappers
+    // while the same <video> keeps playing, and a stale marker would either strand the page
+    // in black or fail to cover a freshly inserted container.
+    this.syncPageBackground();
 
     if (!video) {
       // Debug / force mode is also the smoke test for the renderer itself, so it has to
@@ -240,6 +272,9 @@ export class DouyinAmbientAdapter {
   }
 
   deactivate() {
+    // Always empty the pure black overrides, even if the layer was never mounted: the option
+    // can be flipped on a page that then loses its player, and the page must not stay black.
+    this.clearBlackBackground();
     if (!this.pageActive) return;
     this.pageActive = false;
     this.controller.setVirtualRect(null);
@@ -294,7 +329,10 @@ export class DouyinAmbientAdapter {
       root.setAttribute(MODE_ATTRIBUTE, this.layerMode);
       root.setAttribute(LAYER_ATTRIBUTE, this.layerMode === 'overlay' ? 'overlay' : 'background');
       if (this.layerMode === 'background') {
-        root.style.setProperty('--dal-bg', this.settings.backgroundColor);
+        // The pure black option overrides the backdrop colour in background mode, where the
+        // renderer paints the page background itself.
+        const background = this.settings.pureBlackBackground ? BLACK : this.settings.backgroundColor;
+        root.style.setProperty('--dal-bg', background);
       } else {
         root.style.removeProperty('--dal-bg');
       }
@@ -303,6 +341,7 @@ export class DouyinAmbientAdapter {
       root.removeAttribute(MODE_ATTRIBUTE);
       root.removeAttribute(LAYER_ATTRIBUTE);
       root.removeAttribute(MARKER_ATTRIBUTE);
+      root.removeAttribute(BLACK_ATTRIBUTE);
       root.style.removeProperty('--dal-bg');
       this.clearAncestors();
     }
@@ -342,6 +381,105 @@ export class DouyinAmbientAdapter {
     this.clearedElements.clear();
   }
 
+  /** Reconciles every page-background mechanism with the current video + settings. */
+  syncPageBackground() {
+    this.markBlackBackground();
+    this.markAncestors();
+  }
+
+  // ------------------------------------------------------ pure black background
+
+  /**
+   * The "wall" behind the current player: the video's ancestor chain up to (but excluding)
+   * `<body>`, plus `<body>` and `<html>`. `KEEP_OPAQUE` elements (inputs, dialogs, buttons,
+   * ...) are skipped so their own styling survives. The `<video>` itself is never touched.
+   */
+  blackTargets() {
+    const targets = [];
+    const body = this.document.body ?? null;
+    const root = this.document.documentElement ?? null;
+    for (let node = this.video?.parentElement ?? null; node && node !== body; node = node.parentElement) {
+      if (node.matches?.(KEEP_OPAQUE)) continue;
+      targets.push(node);
+    }
+    if (body) targets.push(body);
+    if (root && root !== body) targets.push(root);
+    return targets;
+  }
+
+  /**
+   * Darkens the boxes that sit directly behind the player so the halo reads like a cinema
+   * screen on a black wall.
+   *
+   * Only the video's own ancestor chain (plus `<body>`/`<html>`) is touched - never the
+   * `<video>`, never an unrelated card or the side bar. The original inline declarations are
+   * captured *before* the first write and never re-captured, so the saved snapshot can only
+   * ever be the page's own style: a second pass can never mistake the black we applied for
+   * the "original" and strand the page in black.
+   *
+   * `background` mode is handled by the renderer instead (the glow is painted *behind* the
+   * page there, so an opaque wall would hide it): only `overlay` mode darkens the page.
+   */
+  markBlackBackground() {
+    if (this.layerMode !== 'overlay' || !this.settings.pureBlackBackground || !this.video) {
+      this.clearBlackBackground();
+      return;
+    }
+    const targets = new Set(this.blackTargets());
+    // Restore whatever dropped out of the chain first (SPA navigation, a rebuilt container),
+    // then darken the current chain.
+    for (const element of [...this.inkedElements.keys()]) {
+      if (!targets.has(element)) this.restoreBackground(element);
+    }
+    for (const element of targets) {
+      this.darkenElement(element);
+      if (!element.hasAttribute(INK_ATTRIBUTE)) element.setAttribute(INK_ATTRIBUTE, '1');
+    }
+    const root = this.document.documentElement;
+    if (root) root.setAttribute(BLACK_ATTRIBUTE, '1');
+  }
+
+  /** Applies the black override, capturing the page's inline value the first time only. */
+  darkenElement(element) {
+    let record = this.inkedElements.get(element);
+    if (!record) {
+      record = new Map();
+      this.inkedElements.set(element, record);
+    }
+    for (const property of ['background-color', 'background-image']) {
+      if (!record.has(property)) {
+        record.set(property, {
+          value: element.style.getPropertyValue(property),
+          priority: element.style.getPropertyPriority(property),
+        });
+      }
+      element.style.setProperty(property, property === 'background-color' ? BLACK : 'none', 'important');
+    }
+  }
+
+  /**
+   * Puts one element's recorded inline background back and forgets it. A recorded value is
+   * only restored while our own `!important` black is still in place: if the page has written
+   * its own value since, that newer value is left alone.
+   */
+  restoreBackground(element) {
+    const record = this.inkedElements.get(element);
+    if (!record) return;
+    for (const [property, saved] of record) {
+      if (!holdsOwnedBlack(element, property)) continue;
+      if (saved.value) element.style.setProperty(property, saved.value, saved.priority);
+      else element.style.removeProperty(property);
+    }
+    element.removeAttribute(INK_ATTRIBUTE);
+    this.inkedElements.delete(element);
+  }
+
+  /** Removes every black override and restores the page's own backgrounds. */
+  clearBlackBackground() {
+    for (const element of [...this.inkedElements.keys()]) this.restoreBackground(element);
+    this.document.documentElement?.removeAttribute(BLACK_ATTRIBUTE);
+  }
+
   // --------------------------------------------------------------- settings
 
   applySettings(settings) {
@@ -359,7 +497,7 @@ export class DouyinAmbientAdapter {
       this.renderer.destroy();
       this.pageActive = false;
     }
-    this.markAncestors();
+    this.syncPageBackground();
     this.update('settings');
   }
 
@@ -407,6 +545,10 @@ export class DouyinAmbientAdapter {
       heartbeat: loop.reason ?? 'idle',
       reason: this.lastReason ?? 'init',
       rendererActive,
+      /** Whether the page backgrounds behind the player are currently forced to black. */
+      pureBlackBackground: Boolean(this.settings.pureBlackBackground),
+      /** How many elements currently carry the black override. */
+      blackElements: this.inkedElements.size,
       rendererMount: this.layerHost()?.tagName ?? null,
       containerSelectors: PLAYER_CONTAINER_SELECTORS.length,
     };
@@ -437,6 +579,7 @@ export class DouyinAmbientAdapter {
       zones: status.zoneRows ? `${status.zoneRows}x${status.zoneCols}:${status.zoneLit}/${status.zoneCount}` : null,
       fps: status.samplingRate,
       renderer: status.rendererActive ? 'active' : 'inactive',
+      black: status.pureBlackBackground ? status.blackElements : 0,
     };
     try {
       root.setAttribute(MARKER_ATTRIBUTE, JSON.stringify(compact));

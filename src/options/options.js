@@ -202,6 +202,11 @@ async function main() {
       '图层模式 Layer mode',
       `${status.layerMode === 'overlay' ? '强制覆盖 overlay' : '页面背景 background'} → ${status.rendererMount ?? '-'}`
     );
+    row(
+      '纯黑背景 Pure black background',
+      status.pureBlackBackground ? `ON（${status.blackElements ?? 0} 个元素已涂黑）` : 'OFF',
+      status.pureBlackBackground ? 'ok' : ''
+    );
     colourRow('当前颜色 Current colour', status.currentColor ?? '#000000');
     row('采样帧率 Sampling FPS', `${status.samplingRate ?? 0} fps`);
     if (status.videoSrc) row('视频地址 Source', status.videoSrc);

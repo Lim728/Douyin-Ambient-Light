@@ -303,6 +303,15 @@ div.dal-root (position: fixed; inset: 0)                ← Shadow DOM 宿主，
 这些修改是可逆的：关闭插件 / 找不到视频 / 出错时属性会被移除，页面恢复原样。设置页也可以关闭
 「透传页面背景」以完全避免修改页面样式。
 
+**「纯黑背景」开关**（可选，弹窗与设置页都有）是唯一会在 **overlay 模式**下写页面的选项：它把视频
+祖先链路 + `<body>` + `<html>` 的背景内联设为 `#000000`（`background-image: none`，均为 `!important`），
+让光晕落在纯黑的墙面上。写入前会先记录每个元素的原始内联 `background-color` / `background-image`，
+而且**只记录一次**，因此反复应用绝不会把自己写进去的黑色当成「原值」而把页面卡死；关闭开关 / 切换
+视频 / 关闭插件时逐条还原（原本没有内联值的元素会被 `removeProperty`，回到页面自己的 CSS）。
+`<video>` 本身永远不被修改；与视频无关的元素（侧栏、标题、其它卡片）只会在它出现在视频祖先链路上
+时才被涂黑，`input / textarea / select / button / [role="dialog"]` 会跳过。在 `background` 模式下页面
+不能被涂黑（否则会遮住位于页面之后的光晕），此时开关改为让渲染器的底色填充变成纯黑。
+
 ### 5.4.1 找不到视频时：异常回退与调试
 
 - **取色失败不回退为「无效果」**：如果 `drawImage` / `getImageData` 因跨域被拒绝，扩展会依次降级为
@@ -312,7 +321,8 @@ div.dal-root (position: fixed; inset: 0)                ← Shadow DOM 宿主，
   （会用一个居中的合成矩形）。
 - **状态 / 诊断面板**：设置页顶部实时显示 `Douyin detected / Video detected / Video playing /
   Video size / Canvas sampling / Ambient renderer / Current color / Sampling resolution /
-  Sampling FPS`；其中 **Sampling resolution** 形如 `媒体 1920 × 1080 → 采样缓冲 96x54（画质切换 2 次）`，
+  Sampling FPS / Pure black background`；其中 **Sampling resolution** 形如
+  `媒体 1920 × 1080 → 采样缓冲 96x54（画质切换 2 次）`，
   是排查「换了清晰度之后没光」的第一手信息。内容脚本还会把同一份快照写入
   `<html data-dal-status="…">`（纯 JSON），方便在 devtools 里直接查看；当前挂载的图层另写在
   `<html data-dal-layer="overlay|background">`，与诊断快照分开，互不覆盖。
@@ -349,7 +359,7 @@ access-control-allow-headers: range
 
 ## 6. 设置
 
-弹窗提供最常用的 8 项，设置页提供全部 21 项，并带有**使用真实采样 + 渲染代码**的实时预览
+弹窗提供最常用的 9 项，设置页提供全部 22 项，并带有**使用真实采样 + 渲染代码**的实时预览
 （每 6 秒切换一次场景，用来观察过渡是否平滑）。
 
 | 设置 | 范围 | 默认 | 说明 |
@@ -367,6 +377,7 @@ access-control-allow-headers: range
 | Black level 黑电平 | 0–100 | 15 | 低于该亮度的分区视为纯黑、不发光 |
 | Sampling FPS 采样帧率 | 5/8/10/12/15/20/30/60 | 12 | 每秒读取画面的次数（60 需要更强的 GPU） |
 | Full-page background | 开/关 | 开 | 是否让颜色铺满整个页面背景 |
+| 纯黑背景 Pure black background | 开/关 | 关 | 把视频周围的背景刷成纯黑 `#000000`；关闭后恢复页面原本的背景 |
 | 暂停时降频 | 开/关 | 开 | 暂停 / 缓冲时停止采样 |
 | 裁剪黑边 | 开/关 | 开 | 忽略内嵌黑边 |
 | 透传页面背景 | 开/关 | 开 | 是否把视频祖先背景设为透明 |
@@ -433,7 +444,7 @@ YouTube / B 站专用 DOM 逻辑、Sentry 上报等都无法直接用于抖音�
 
 ## 9. 测试
 
-### 单元测试（Vitest，121 个用例）
+### 单元测试（Vitest，133 个用例）
 
 覆盖颜色数学（线性光混合、饱和/亮度、hex 解析）、设置归一化与钳制、storage 读写与订阅、
 采样缓冲区算术（亮度剖面、黑边检测、四边分带、**3×3 逐格均值与中心格排除**、`object-fit` 裁剪）、
@@ -444,8 +455,12 @@ YouTube / B 站专用 DOM 逻辑、Sentry 上报等都无法直接用于抖音�
 媒体源切换后重置黑边历史）、
 视频打分（可见性、面积、播放状态、时钟前进、e2e 加分、防抖、shadow DOM），
 以及取色失败时的降级链（fallback 底色 → poster 封面 → 每 3 秒重试）与 Debug / Force 渲染。
+**「纯黑背景」开关单独一组**：开启后只涂黑视频祖先链路 + `<body>` + `<html>`、不碰 `<video>`、
+不碰第二个播放器、不碰无关元素；重复应用不会把自己写的黑色记录成原值；关闭时逐条还原（原本没有
+内联背景的元素回到「没有内联背景」）；页面在扩展持黑期间改写自己的背景时不会被旧快照覆盖；
+视频切换时旧链路还原、新链路涂黑；`background` 模式不涂黑页面。
 
-### 端到端测试（Playwright，49 项检查）
+### 端到端测试（Playwright，59 项检查）
 
 `tests/e2e/run.mjs` 用 Playwright 启动真实 Chromium 并加载构建产物 `dist/`，
 再把 `https://www.douyin.com/` 与 `https://live.douyin.com/` 的所有请求（含 query string）重定向到仿真页 `tests/e2e/harness.html` —— 也就是说
@@ -466,7 +481,9 @@ YouTube / B 站专用 DOM 逻辑、Sentry 上报等都无法直接用于抖音�
 每次切换后「左上红 / 右上蓝 / 下方黑」的分区仍然各自独立、播放不中断、光晕继续跟随画面。
 
 弹窗写设置、Debug 红色 / 蓝色强制渲染、关闭后页面完全还原、
-设置页预览真实渲染、21 个设置项齐全、15 行诊断面板、移除全部播放器后页面完全还原、无控制台错误。
+**「纯黑背景」开关**（弹窗中存在且默认关闭、点击后写入 storage 并真的把页面涂黑、再点一次恢复
+`rgb(22, 24, 35)` 原始背景、播放器重建后无残留标记、关闭开关后光晕仍在运行）、
+设置页预览真实渲染、22 个设置项齐全、16 行诊断面板、移除全部播放器后页面完全还原、无控制台错误。
 
 运行：
 

@@ -40,6 +40,19 @@ describe('normalizeSettings', () => {
     expect(normalizeSettings({ enabled: 0 }).enabled).toBe(false);
   });
 
+  it('defaults the pure black background option to off', () => {
+    expect(DEFAULTS.pureBlackBackground).toBe(false);
+    expect(normalizeSettings({}).pureBlackBackground).toBe(false);
+    expect(normalizeSettings({ pureBlackBackground: 'nonsense' }).pureBlackBackground).toBe(false);
+  });
+
+  it('accepts an explicit pure black background value', () => {
+    expect(normalizeSettings({ pureBlackBackground: true }).pureBlackBackground).toBe(true);
+    expect(normalizeSettings({ pureBlackBackground: 'true' }).pureBlackBackground).toBe(true);
+    expect(normalizeSettings({ pureBlackBackground: 1 }).pureBlackBackground).toBe(true);
+    expect(normalizeSettings({ pureBlackBackground: 'false' }).pureBlackBackground).toBe(false);
+  });
+
   it('validates the background colour', () => {
     expect(normalizeSettings({ backgroundColor: '#ABC' }).backgroundColor).toBe('#aabbcc');
     expect(normalizeSettings({ backgroundColor: 'red' }).backgroundColor).toBe(DEFAULTS.backgroundColor);
