@@ -473,17 +473,301 @@ input.dal-input[type="color"] {
 
 /* ------------------------------------------------------------------ popup */
 
+/*
+ * The popup follows the reference mockups: app mark + live status line, a highlighted master
+ * switch, a two tab strip and a footer action bar. Only the options page keeps the plain
+ * single column layout, which is why every rule below is scoped to `.dal-popup`.
+ */
+
 .dal-popup {
   width: 344px;
   padding: 14px 14px 12px;
 }
 
-.dal-popup .dal-card {
-  padding: 12px 13px;
+.dal-popup-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.dal-popup-logo {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: block;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 6px 14px rgba(0, 0, 0, 0.45);
+}
+
+.dal-popup-headtext {
+  flex: 1;
+  min-width: 0;
+}
+
+.dal-popup .dal-title {
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.dal-popup .dal-subtitle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+  font-size: 11.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dal-status-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #6d7686;
+  box-shadow: 0 0 6px currentColor;
+  color: #6d7686;
+}
+
+.dal-status-dot.is-on {
+  background: #49d07c;
+  color: #49d07c;
+}
+
+.dal-status-dot.is-off {
+  background: #ff6b6b;
+  color: #ff6b6b;
+}
+
+.dal-status-dot.is-warn {
+  background: #ffb347;
+  color: #ffb347;
+}
+
+.dal-icon-btn {
+  flex: none;
+  appearance: none;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--dal-line);
+  background: var(--dal-panel);
+  color: var(--dal-text-dim);
+  cursor: pointer;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.dal-icon-btn:hover {
+  color: var(--dal-text);
+  border-color: #3a3d4a;
+}
+
+.dal-icon-btn svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* --------- master switch --------- */
+
+.dal-master {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 13px;
+  border: 1px solid var(--dal-line);
+  border-radius: var(--dal-radius);
+  background: var(--dal-panel);
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.dal-master.is-on {
+  border-color: rgba(87, 182, 255, 0.45);
+  background: linear-gradient(180deg, rgba(87, 182, 255, 0.1), rgba(87, 182, 255, 0.02)), var(--dal-panel);
+}
+
+.dal-master.is-off {
+  border-color: rgba(255, 107, 107, 0.35);
+}
+
+.dal-master-icon {
+  flex: none;
+  display: inline-flex;
+  color: #7a8290;
+}
+
+.dal-master-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.dal-master.is-on .dal-master-icon {
+  color: var(--dal-accent);
+}
+
+.dal-master.is-off .dal-master-icon {
+  color: #ff6b6b;
+}
+
+.dal-master-label {
+  flex: 1;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+/* --------- tabs --------- */
+
+.dal-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 56px;
+  margin: 14px 0 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.dal-tab {
+  appearance: none;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 6px 10px;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--dal-text-dim);
+  transition: color 140ms ease;
+}
+
+.dal-tab svg {
+  width: 13px;
+  height: 13px;
+}
+
+.dal-tab:hover {
+  color: var(--dal-text);
+}
+
+.dal-tab.is-active {
+  color: #dceaff;
+}
+
+.dal-tab.is-active::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--dal-accent), var(--dal-accent-2));
+  box-shadow: 0 0 8px rgba(87, 182, 255, 0.6);
+}
+
+/* --------- setting cards --------- */
+
+.dal-panel-card {
+  padding: 4px 14px;
+  border: 1px solid var(--dal-line);
+  border-radius: var(--dal-radius);
+  background: var(--dal-panel);
+}
+
+.dal-panel-card[hidden] {
+  display: none;
 }
 
 .dal-popup .dal-field {
-  padding: 7px 0;
+  padding: 11px 0;
+}
+
+.dal-popup .dal-field-head {
+  margin-bottom: 8px;
+}
+
+.dal-popup .dal-field-head label {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+/* The numeric pill only belongs next to a slider: selects / colours have no reading to show. */
+.dal-popup .dal-field--range .dal-field-value {
+  min-width: 42px;
+  padding: 1px 7px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  background: #1e222c;
+  color: #dbe3f2;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+/* Toggle rows read like the reference: label on the left, switch on the right. */
+.dal-popup .dal-field--toggle .dal-switch {
+  width: 100%;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dal-popup .dal-field--toggle .dal-switch-label {
+  order: 1;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.dal-popup .dal-field--toggle .dal-switch-track {
+  order: 2;
+}
+
+.dal-popup .dal-field-hint {
+  margin-top: 7px;
+  font-size: 11px;
+  color: #7e8698;
+}
+
+.dal-popup .dal-input[type='range']::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    #cdd5e6 var(--dal-fill, 50%),
+    rgba(255, 255, 255, 0.12) var(--dal-fill, 50%)
+  );
+}
+
+.dal-popup .dal-input[type='range']::-webkit-slider-thumb {
+  width: 15px;
+  height: 15px;
+  margin-top: -5.5px;
+  border: 0;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(87, 182, 255, 0.18), 0 1px 5px rgba(0, 0, 0, 0.6);
+}
+
+.dal-popup select.dal-input {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 8px 30px 8px 10px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239aa0b0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 12px 12px;
+}
+
+/* The whole panel dims while the master switch is off (the reference "closed" state). */
+.dal-popup--off .dal-tabs,
+.dal-popup--off .dal-panels {
+  opacity: 0.55;
 }
 
 .dal-popup-actions {
@@ -494,12 +778,47 @@ input.dal-input[type="color"] {
   margin-top: 12px;
 }
 
+.dal-popup .dal-btn--primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border-radius: 9px;
+  font-weight: 600;
+}
+
+.dal-popup .dal-btn--primary svg {
+  width: 13px;
+  height: 13px;
+}
+
+.dal-popup .dal-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 12px;
+  font-size: 11px;
+  color: #79818f;
+}
+
+.dal-note-shield {
+  flex: none;
+  display: inline-flex;
+  margin-top: 1.5px;
+  color: #49d07c;
+}
+
+.dal-note-shield svg {
+  width: 12px;
+  height: 12px;
+}
+
 .dal-kbd {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 10.5px;
   border: 1px solid var(--dal-line);
   border-bottom-width: 2px;
   border-radius: 5px;
-  padding: 1px 5px;
+  padding: 2px 7px;
   color: var(--dal-text-dim);
 }

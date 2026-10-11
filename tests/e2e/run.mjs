@@ -581,6 +581,67 @@ async function main() {
       JSON.stringify(matchedTabs)
     );
 
+    // ---------------------------------------------------------------- popup chrome
+    const popupChrome = await popup.evaluate(() => {
+      const master = document.getElementById('dal-master');
+      const tabs = [...document.querySelectorAll('.dal-tab')].map((tab) => ({
+        name: tab.dataset.tab,
+        active: tab.classList.contains('is-active'),
+      }));
+      const glowFields = [...document.querySelectorAll('[data-panel="glow"] .dal-field')].map(
+        (field) => field.dataset.key
+      );
+      const morePanel = document.querySelector('[data-panel="more"]');
+      const blur = document.querySelector('[data-key="blur"] input[type="range"]');
+      return {
+        hasMaster: Boolean(master) && master.dataset.key === 'enabled',
+        masterChecked: document.getElementById('dal-master-toggle')?.checked ?? null,
+        masterLabel: document.getElementById('dal-master-label')?.textContent ?? '',
+        tabs,
+        glowFields,
+        moreHidden: Boolean(morePanel?.hidden),
+        blurFill: blur?.style.getPropertyValue('--dal-fill') ?? '',
+        dotClass: document.getElementById('dal-popup-dot')?.className ?? '',
+      };
+    });
+    check(
+      'popup has the master switch and the 光效 / 更多 tabs',
+      popupChrome.hasMaster &&
+        popupChrome.masterChecked === true &&
+        popupChrome.masterLabel === '开启' &&
+        popupChrome.tabs.length === 2 &&
+        popupChrome.tabs[0].name === 'glow' &&
+        popupChrome.tabs[0].active === true &&
+        popupChrome.tabs[1].name === 'more' &&
+        popupChrome.tabs[1].active === false,
+      JSON.stringify(popupChrome.tabs)
+    );
+    check(
+      'the 光效 tab shows the five glow sliders with a live track fill',
+      popupChrome.glowFields.join(',') === 'blur,intensity,spread,smoothness,edgeFocus' &&
+        popupChrome.blurFill !== '' &&
+        popupChrome.moreHidden === true &&
+        popupChrome.dotClass.includes('is-on'),
+      JSON.stringify({ fields: popupChrome.glowFields, fill: popupChrome.blurFill, dot: popupChrome.dotClass })
+    );
+
+    await popup.click('.dal-tab[data-tab="more"]');
+    await sleep(300);
+    const moreTab = await popup.evaluate(() => ({
+      moreHidden: Boolean(document.querySelector('[data-panel="more"]')?.hidden),
+      glowHidden: Boolean(document.querySelector('[data-panel="glow"]')?.hidden),
+      active: document.querySelector('.dal-tab[data-tab="more"]')?.classList.contains('is-active') ?? false,
+      fields: [...document.querySelectorAll('[data-panel="more"] .dal-field')].map((field) => field.dataset.key),
+    }));
+    check(
+      'the 更多 tab reveals the sampling and background switches',
+      moreTab.moreHidden === false &&
+        moreTab.glowHidden === true &&
+        moreTab.active &&
+        moreTab.fields.join(',') === 'samplingFps,fullPageBackground,pureBlackBackground',
+      JSON.stringify(moreTab)
+    );
+
     // ------------------------------------------------------ pure black background toggle
     const pureBlackField = await popup.evaluate(() => {
       const field = document.querySelector('[data-key="pureBlackBackground"]');

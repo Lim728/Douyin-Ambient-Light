@@ -31,3 +31,8 @@ desktop.ini
 .vscode/
 *.swp
 *~
+
+# ---------------------------------------------------------------- local design refs
+# UI reference screenshots kept in the working copy only - they are design input, not
+# runtime assets, so they are never shipped or committed.
+foto/
