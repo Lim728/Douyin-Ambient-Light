@@ -132,6 +132,17 @@ export function evaluateVideo(video, options = {}) {
   if (!video || typeof video.getBoundingClientRect !== 'function') return null;
   if (!video.isConnected) return null;
 
+  // Profile cards can autoplay at substantial sizes. Playback alone is not intent.
+  // Only a dedicated detail route or actual fullscreen player is eligible there.
+  const location = video.ownerDocument?.location;
+  if (location && /^\/user(?:\/|$)/.test(location.pathname)) {
+    const fullscreen = options.fullscreenElement;
+    const inFullscreen = fullscreen && (fullscreen === video || fullscreen.contains(video));
+    const detailId = new URLSearchParams(location.search).get('modal_id');
+    const detailPlayer = video.closest('#sliderVideo, [data-e2e="feed-active-video"]');
+    if (!inFullscreen && !(detailId && detailPlayer)) return null;
+  }
+
   const rect = video.getBoundingClientRect();
   if (rect.width < MIN_VIDEO_SIDE || rect.height < MIN_VIDEO_SIDE) {
     reasons.push(DETECT_REASONS.TOO_SMALL);
@@ -218,10 +229,13 @@ export function selectBestVideo(options = {}) {
 /** Finds the closest player container, used for the ResizeObserver and the attribute hooks. */
 export function findContainer(video) {
   if (!video) return null;
-  for (const selector of PLAYER_CONTAINER_SELECTORS) {
-    const match = video.closest(selector);
-    if (match) return match;
-  }
-  const parent = video.parentElement;
-  return parent && parent !== document.body ? parent : video;
+  // closest() over the combined selector respects DOM distance, not selector priority.
+  const match = video.closest(PLAYER_CONTAINER_SELECTORS.join(','));
+  const parent = match ?? video.parentElement;
+  if (!parent || parent === video.ownerDocument.body || parent === video.ownerDocument.documentElement) return video;
+  const bounds = parent.getBoundingClientRect();
+  const rect = video.getBoundingClientRect();
+  // A page-wide wrapper is not a player. Geometry remains anchored to the video.
+  if (bounds.width > rect.width * 2 || bounds.height > rect.height * 2) return video;
+  return parent;
 }

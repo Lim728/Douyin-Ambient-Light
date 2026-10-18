@@ -32,6 +32,7 @@ function createAdapter(overrides = {}) {
 /** Builds `body > #wrapper > #card > #player > video` with an inline card background. */
 function buildPage({ cardColor = '#161823', id = 'one' } = {}) {
   const wrapper = document.createElement('div');
+  wrapper.className = 'xgplayer';
   wrapper.id = `wrapper-${id}`;
   const card = document.createElement('div');
   card.id = `card-${id}`;
@@ -74,7 +75,7 @@ describe('pure black background', () => {
     adapter.video = video;
     adapter.syncPageBackground();
 
-    for (const element of [wrapper, card, player, document.body, document.documentElement]) {
+    for (const element of [wrapper, card, player]) {
       expect(element.style.getPropertyPriority('background-color')).toBe('important');
       expect(element.style.getPropertyValue('background-color')).toBe(BLACK);
       expect(element.style.getPropertyPriority('background-image')).toBe('important');
@@ -142,7 +143,7 @@ describe('pure black background', () => {
     expect(second.card.style.getPropertyValue('background-color')).toBe('rgb(22, 24, 35)');
     expect(second.card.hasAttribute('data-dal-ink')).toBe(false);
     // wrapper + card + player of the active video, plus <body> and <html>.
-    expect(document.querySelectorAll('[data-dal-ink]').length).toBe(5);
+    expect(document.querySelectorAll('[data-dal-ink]').length).toBe(3);
   });
 
   it('restores the old chain and darkens the new one when the video is swapped', () => {
@@ -188,13 +189,66 @@ describe('pure black background', () => {
     expect(document.querySelectorAll('[data-dal-ink]').length).toBe(0);
   });
 
-  it('does not darken the page in background layer mode', () => {
+  it('darkens only the player in background layer mode', () => {
     const { card, video } = buildPage();
     const adapter = createAdapter({ pureBlackBackground: true, layerMode: 'background' });
     adapter.video = video;
     adapter.syncPageBackground();
 
-    expect(document.querySelectorAll('[data-dal-ink]').length).toBe(0);
-    expect(card.style.getPropertyValue('background-color')).toBe('rgb(22, 24, 35)');
+    expect(document.querySelectorAll('[data-dal-ink]').length).toBe(3);
+    expect(card.style.getPropertyValue('background-color')).toBe(BLACK);
   });
+});
+
+
+it('clears selected media and page effects when disabled', () => {
+  const { video } = buildPage();
+  const adapter = createAdapter();
+  adapter.video = video;
+  adapter.pageActive = true;
+  adapter.applyRootState(true);
+  adapter.applySettings({ ...DEFAULTS, enabled: false });
+  expect(adapter.video).toBeNull();
+  expect(adapter.container).toBeNull();
+  expect(adapter.pageActive).toBe(false);
+  expect(document.documentElement.hasAttribute('data-dal')).toBe(false);
+});
+
+
+it('keeps black independent of glow and wash, and restores on profile return and teardown', () => {
+  history.replaceState({}, '', '/user/example?modal_id=123');
+  const { wrapper, card, video } = buildPage();
+  wrapper.id = 'sliderVideo';
+  video.getBoundingClientRect = () => /** @type {DOMRect} */ ({ left: 300, top: 100, right: 700, bottom: 600, width: 400, height: 500 });
+  for (const [key, value] of Object.entries({ readyState: 4, videoWidth: 400, videoHeight: 500, paused: false })) Object.defineProperty(video, key, { configurable: true, value });
+  const adapter = createAdapter({ pureBlackBackground: true });
+  adapter.update();
+  expect(card.style.backgroundColor).toBe(BLACK);
+  expect(document.body.style.backgroundColor).toBe('');
+  expect(document.documentElement.style.backgroundColor).toBe('');
+  for (const fullPageBackground of [false, true]) {
+    adapter.applySettings({ ...DEFAULTS, pureBlackBackground: true, enabled: false, fullPageBackground });
+    expect(adapter.pageActive).toBe(false);
+    expect(card.style.backgroundColor).toBe(BLACK);
+  }
+  card.style.backgroundColor = 'red';
+  adapter.update();
+  adapter.applySettings({ ...DEFAULTS, enabled: false });
+  expect(card.style.backgroundColor).toBe('red');
+  adapter.applySettings({ ...DEFAULTS, pureBlackBackground: true });
+  history.replaceState({}, '', '/user/example');
+  adapter.handleNavigation();
+  expect(adapter.video).toBeNull();
+  expect(card.style.backgroundColor).toBe('red');
+  history.replaceState({}, '', '/video/123');
+  adapter.update();
+  expect(card.style.backgroundColor).toBe(BLACK);
+  adapter.destroy();
+  expect(card.style.backgroundColor).toBe('red');
+  const reloaded = createAdapter({ enabled: false, pureBlackBackground: true });
+  reloaded.update();
+  expect(card.style.backgroundColor).toBe(BLACK);
+  reloaded.destroy();
+  expect(card.style.backgroundColor).toBe('red');
+  history.replaceState({}, '', '/');
 });

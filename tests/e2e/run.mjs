@@ -673,7 +673,7 @@ async function main() {
     }));
     check(
       'the popup toggle actually reaches the page (background turns black)',
-      inkWhileOn.marker === '1' && inkWhileOn.inked >= 3 && inkWhileOn.html === 'rgb(0, 0, 0)',
+      inkWhileOn.marker === '1' && inkWhileOn.inked === 1 && inkWhileOn.html === 'rgb(22, 24, 35)',
       JSON.stringify(inkWhileOn)
     );
 
@@ -741,7 +741,7 @@ async function main() {
     await sleep(1800);
     const blackOn = await page.evaluate(() => {
       const inked = Array.from(document.querySelectorAll('[data-dal-ink]'));
-      const root = document.querySelector('#root');
+      const root = document.querySelector('#player').closest('.xgplayer');
       const status = JSON.parse(document.documentElement.getAttribute('data-dal-status') ?? '{}');
       return {
         marker: document.documentElement.getAttribute('data-dal-black'),
@@ -758,14 +758,14 @@ async function main() {
     check(
       'pure black: the background behind the player turns solid black',
       blackOn.marker === '1' &&
-        blackOn.html === 'rgb(0, 0, 0)' &&
+        blackOn.html === 'rgb(22, 24, 35)' &&
         blackOn.root === 'rgb(0, 0, 0)' &&
         blackOn.rootPriority === 'important',
       JSON.stringify({ marker: blackOn.marker, html: blackOn.html, root: blackOn.root })
     );
     check(
       'pure black: only the video chain is inked and it is reported in the status',
-      blackOn.inked >= 4 && blackOn.connected && blackOn.black >= 4,
+      blackOn.inked === 1 && blackOn.connected && blackOn.black === 1,
       JSON.stringify({ inked: blackOn.inked, black: blackOn.black })
     );
     check(
@@ -782,7 +782,7 @@ async function main() {
       return {
         inked: inked.length,
         connected: inked.every((node) => node.isConnected),
-        cardInked: Boolean(document.querySelector('.feed-card[data-dal-ink]')),
+        cardInked: Boolean(document.querySelector('.xgplayer[data-dal-ink]')),
         root: getComputedStyle(document.querySelector('#root')).backgroundColor,
       };
     });
@@ -790,11 +790,21 @@ async function main() {
       'pure black: survives a recreated player without leftover markers',
       blackAfterRemount.connected &&
         blackAfterRemount.cardInked &&
-        blackAfterRemount.inked >= 3 &&
-        blackAfterRemount.root === 'rgb(0, 0, 0)',
+        blackAfterRemount.inked === 1 &&
+        blackAfterRemount.root !== 'rgb(0, 0, 0)',
       JSON.stringify(blackAfterRemount)
     );
 
+    await setSettings({ enabled: false, fullPageBackground: false });
+    await sleep(1800);
+    const blackWithoutGlow = await page.evaluate(() => ({
+      glow: Boolean(document.querySelector('.dal-root')),
+      background: getComputedStyle(document.querySelector('#player').closest('.xgplayer')).backgroundColor,
+    }));
+    check('black remains scoped when glow and full-page wash are off',
+      !blackWithoutGlow.glow && blackWithoutGlow.background === 'rgb(0, 0, 0)', JSON.stringify(blackWithoutGlow));
+    await setSettings({ enabled: true, fullPageBackground: true });
+    await sleep(1800);
     await setSettings({ pureBlackBackground: false });
     await sleep(1800);
     const blackOff = await page.evaluate(() => {

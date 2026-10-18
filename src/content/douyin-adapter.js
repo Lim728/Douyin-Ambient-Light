@@ -90,6 +90,7 @@ export class DouyinAmbientAdapter {
     this.scheduleUpdate = debounce(() => this.update('mutation'), MUTATION_DEBOUNCE_MS);
     this.scheduleMediaUpdate = debounce(() => this.update('media'), MEDIA_EVENT_DEBOUNCE_MS);
     this.handleScroll = throttle(() => {
+      this.update('scroll');
       if (this.pageActive) this.controller.refreshGeometry();
     }, SCROLL_THROTTLE_MS);
   }
@@ -112,6 +113,8 @@ export class DouyinAmbientAdapter {
     this.document.addEventListener('fullscreenchange', this.handleFullscreenChange);
     this.document.addEventListener('webkitfullscreenchange', this.handleFullscreenChange);
     this.document.addEventListener('visibilitychange', this.handleVisibilityChange);
+    this.window.addEventListener('popstate', this.handleNavigation);
+    this.window.addEventListener('hashchange', this.handleNavigation);
     this.window.addEventListener('resize', this.handleResize, { passive: true });
     this.document.addEventListener('scroll', this.handleScroll, { capture: true, passive: true });
   }
@@ -123,6 +126,8 @@ export class DouyinAmbientAdapter {
     this.document.removeEventListener('fullscreenchange', this.handleFullscreenChange);
     this.document.removeEventListener('webkitfullscreenchange', this.handleFullscreenChange);
     this.document.removeEventListener('visibilitychange', this.handleVisibilityChange);
+    this.window.removeEventListener('popstate', this.handleNavigation);
+    this.window.removeEventListener('hashchange', this.handleNavigation);
     this.window.removeEventListener('resize', this.handleResize);
     this.document.removeEventListener('scroll', this.handleScroll, true);
   }
@@ -144,6 +149,8 @@ export class DouyinAmbientAdapter {
       this.resizeObserver.observe(target);
     }
   }
+
+  handleNavigation = () => this.update('navigation');
 
   handleResize = () => {
     this.renderer.invalidate();
@@ -174,7 +181,7 @@ export class DouyinAmbientAdapter {
     if (this.destroyed) return;
     this.lastReason = reason;
     const settings = this.settings;
-    if (!settings.enabled) {
+    if (!settings.enabled && !settings.pureBlackBackground) {
       this.deactivate();
       return;
     }
@@ -219,11 +226,26 @@ export class DouyinAmbientAdapter {
       return;
     }
 
+    if (!settings.enabled) {
+      this.stopGlow();
+      this.syncPageBackground();
+      return;
+    }
     this.pageActive = true;
     this.applyRootState(true);
     this.reparentLayer();
     this.renderer.mount(this.layerHost());
     this.renderer.setVisible(true);
+    // Profile detail overlays share a document with the header and grid. Bound the
+    // composited layer (including CSS blur) to the actual video neighbourhood.
+    const root = this.renderer.root;
+    if (root) {
+      if (this.isProfile && !this.fullscreenElement) {
+        const rect = video.getBoundingClientRect();
+        const margin = 24;
+        root.style.setProperty('clip-path', `inset(${Math.max(0, rect.top - margin)}px ${Math.max(0, viewportWidth - rect.right - margin)}px ${Math.max(0, viewportHeight - rect.bottom - margin)}px ${Math.max(0, rect.left - margin)}px)`, 'important');
+      } else root.style.removeProperty('clip-path');
+    }
 
     if (video.paused || video.ended) {
       // The debug / force mode must keep painting even while the video is paused.
@@ -271,10 +293,25 @@ export class DouyinAmbientAdapter {
     return { left, top, width, height, right: left + width, bottom: top + height };
   }
 
+  stopGlow() {
+    this.pageActive = false;
+    this.controller.stop();
+    this.controller.setVirtualRect(null);
+    this.renderer.setVisible(false);
+    this.renderer.unmount();
+    this.clearAncestors();
+    this.applyRootState(false);
+  }
+
   deactivate() {
     // Always empty the pure black overrides, even if the layer was never mounted: the option
     // can be flipped on a page that then loses its player, and the page must not stay black.
     this.clearBlackBackground();
+    this.video = null;
+    this.container = null;
+    this.controller.setVideo(null);
+    this.clearAncestors();
+    this.applyRootState(false);
     if (!this.pageActive) return;
     this.pageActive = false;
     this.controller.setVirtualRect(null);
@@ -329,9 +366,8 @@ export class DouyinAmbientAdapter {
       root.setAttribute(MODE_ATTRIBUTE, this.layerMode);
       root.setAttribute(LAYER_ATTRIBUTE, this.layerMode === 'overlay' ? 'overlay' : 'background');
       if (this.layerMode === 'background') {
-        // The pure black option overrides the backdrop colour in background mode, where the
-        // renderer paints the page background itself.
-        const background = this.settings.pureBlackBackground ? BLACK : this.settings.backgroundColor;
+        // The optional black background is scoped to the player separately.
+        const background = this.settings.backgroundColor;
         root.style.setProperty('--dal-bg', background);
       } else {
         root.style.removeProperty('--dal-bg');
@@ -382,46 +418,33 @@ export class DouyinAmbientAdapter {
   }
 
   /** Reconciles every page-background mechanism with the current video + settings. */
+  get isProfile() {
+    return /^\/user(?:\/|$)/.test(this.document.location?.pathname ?? '');
+  }
+
   syncPageBackground() {
+    if (this.isProfile || !this.settings.enabled || this.settings.pureBlackBackground) this.clearAncestors();
+    else this.markAncestors();
     this.markBlackBackground();
-    this.markAncestors();
   }
 
   // ------------------------------------------------------ pure black background
 
-  /**
-   * The "wall" behind the current player: the video's ancestor chain up to (but excluding)
-   * `<body>`, plus `<body>` and `<html>`. `KEEP_OPAQUE` elements (inputs, dialogs, buttons,
-   * ...) are skipped so their own styling survives. The `<video>` itself is never touched.
-   */
+  /** Only the chain inside the bounded player; never the document or shared page wrappers. */
   blackTargets() {
     const targets = [];
-    const body = this.document.body ?? null;
-    const root = this.document.documentElement ?? null;
-    for (let node = this.video?.parentElement ?? null; node && node !== body; node = node.parentElement) {
-      if (node.matches?.(KEEP_OPAQUE)) continue;
-      targets.push(node);
+    const boundary = findContainer(this.video);
+    if (!boundary || boundary === this.video) return targets;
+    for (let node = this.video.parentElement; node; node = node.parentElement) {
+      if (!node.matches?.(KEEP_OPAQUE)) targets.push(node);
+      if (node === boundary) break;
     }
-    if (body) targets.push(body);
-    if (root && root !== body) targets.push(root);
     return targets;
   }
 
-  /**
-   * Darkens the boxes that sit directly behind the player so the halo reads like a cinema
-   * screen on a black wall.
-   *
-   * Only the video's own ancestor chain (plus `<body>`/`<html>`) is touched - never the
-   * `<video>`, never an unrelated card or the side bar. The original inline declarations are
-   * captured *before* the first write and never re-captured, so the saved snapshot can only
-   * ever be the page's own style: a second pass can never mistake the black we applied for
-   * the "original" and strand the page in black.
-   *
-   * `background` mode is handled by the renderer instead (the glow is painted *behind* the
-   * page there, so an opaque wall would hide it): only `overlay` mode darkens the page.
-   */
+  /** Reconcile scoped black independently of the glow mode and full-page wash. */
   markBlackBackground() {
-    if (this.layerMode !== 'overlay' || !this.settings.pureBlackBackground || !this.video) {
+    if (!this.settings.pureBlackBackground || !this.video) {
       this.clearBlackBackground();
       return;
     }
@@ -447,7 +470,7 @@ export class DouyinAmbientAdapter {
       this.inkedElements.set(element, record);
     }
     for (const property of ['background-color', 'background-image']) {
-      if (!record.has(property)) {
+      if (!record.has(property) || !holdsOwnedBlack(element, property)) {
         record.set(property, {
           value: element.style.getPropertyValue(property),
           priority: element.style.getPropertyPriority(property),
@@ -485,10 +508,6 @@ export class DouyinAmbientAdapter {
   applySettings(settings) {
     const previousMode = this.settings?.layerMode;
     this.settings = settings;
-    if (!settings.enabled) {
-      this.deactivate();
-      return;
-    }
     // Switching between overlay and background rebuilds the layer at a different z-index
     // and in a different host element.
     if (previousMode && previousMode !== settings.layerMode) {
@@ -497,7 +516,6 @@ export class DouyinAmbientAdapter {
       this.renderer.destroy();
       this.pageActive = false;
     }
-    this.syncPageBackground();
     this.update('settings');
   }
 

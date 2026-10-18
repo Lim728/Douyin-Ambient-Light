@@ -523,9 +523,9 @@ export class AmbientRenderer {
     // Background mode paints its own opaque backdrop; overlay mode must stay transparent so
     // the page under the layer keeps showing through.
     if (!this.isOverlay) {
-      // `pureBlackBackground` overrides the backdrop colour so the halo sits on a black wall
+      // The player-scoped black background is managed by the adapter
       // (only meaningful here: in overlay mode the page itself is darkened by the adapter).
-      const background = hexToRgb(settings.pureBlackBackground ? '#000000' : settings.backgroundColor);
+      const background = hexToRgb(settings.backgroundColor);
       ctx.fillStyle = rgba(background, 1);
       ctx.fillRect(0, 0, width, height);
     }

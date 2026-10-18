@@ -163,3 +163,36 @@ describe('findContainer / isPlaying', () => {
     expect(isPlaying(video)).toBe(true);
   });
 });
+
+
+describe('profile preview eligibility', () => {
+  it('rejects autoplay cards, follows detail playback and rejects them again on return', () => {
+    document.body.innerHTML = '';
+    history.replaceState({}, '', '/user/example');
+    const rect = { left: 400, top: 100, width: 400, height: 500 };
+    const preview = createVideo({ rect, paused: false });
+    const second = createVideo({ rect, paused: false });
+    expect(selectBestVideo({ ...VIEWPORT, videos: [preview, second] })).toBeNull();
+    history.replaceState({}, '', '/video/123');
+    expect(selectBestVideo({ ...VIEWPORT, videos: [preview] }).video).toBe(preview);
+    Object.defineProperty(preview, 'paused', { configurable: true, value: true });
+    expect(evaluateVideo(preview, VIEWPORT).playing).toBe(false);
+    expect(selectBestVideo({ ...VIEWPORT, videos: [second] }).video).toBe(second);
+    history.replaceState({}, '', '/user/example');
+    expect(selectBestVideo({ ...VIEWPORT, videos: [preview, second], previous: second })).toBeNull();
+    history.replaceState({}, '', '/');
+  });
+
+  it('requires a detail player as well as a modal route on a profile', () => {
+    document.body.innerHTML = '';
+    history.replaceState({}, '', '/user/example?modal_id=123');
+    const video = createVideo({ rect: { left: 400, top: 100, width: 400, height: 500 }, paused: false });
+    expect(evaluateVideo(video, VIEWPORT)).toBeNull();
+    const detail = document.createElement('div');
+    detail.id = 'sliderVideo';
+    document.body.append(detail);
+    detail.append(video);
+    expect(evaluateVideo(video, VIEWPORT)).not.toBeNull();
+    history.replaceState({}, '', '/');
+  });
+});
