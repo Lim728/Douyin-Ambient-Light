@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "抖音氛围光 · Douyin Ambient Light",
   "short_name": "抖音氛围光",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "为抖音网页版（douyin.com）视频添加影院级动态氛围光。画面仅在本机浏览器内取色，不上传任何数据。",
   "minimum_chrome_version": "111",
   "icons": {
