@@ -95,3 +95,11 @@ describe('storage with chrome.storage available', () => {
     unsubscribe();
   });
 });
+
+
+it('persists independent image and video black preferences with glow off', async () => {
+  await saveSettings({ ...DEFAULTS, pureBlackBackground: true, imageBlackBackground: true, enabled: false });
+  expect(await loadSettings()).toMatchObject({ pureBlackBackground: true, imageBlackBackground: true, enabled: false });
+  await patchSettings({ imageBlackBackground: false });
+  expect(await loadSettings()).toMatchObject({ pureBlackBackground: true, imageBlackBackground: false, enabled: false });
+});

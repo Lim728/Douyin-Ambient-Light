@@ -69,9 +69,10 @@ export const DEFAULTS = Object.freeze({
   // Paint the sampled colour across the whole page background, not only around the video.
   fullPageBackground: true,
   // Paint the backgrounds that sit behind the video pure black (#000000). Off by default:
-  // it is the only option that writes to the page's own backgrounds, so an existing install
+  // Like the separate image option, it defaults off so an existing install
   // keeps exactly the look it had until the user opts in.
   pureBlackBackground: false,
+  imageBlackBackground: false,
   // 0-100, weight of the four edge bands relative to the whole frame average.
   // Reused by the zoned renderer as the "zone contrast": how aggressively zones that carry
   // little light are suppressed (0 = every zone glows, 100 = only the brightest zones do).
@@ -290,9 +291,10 @@ export const OPTION_SCHEMA = Object.freeze([
   },
   { key: 'fullPageBackground', type: 'toggle', label: '全页背景 Full-page background', hint: '让氛围光铺满整个页面背景' },
   {
-    key: 'pureBlackBackground', type: 'toggle', label: '纯黑背景 Pure black background',
+    key: 'pureBlackBackground', type: 'toggle', label: '视频背景黑色',
     hint: '把视频周围的背景刷成纯黑 #000000；关闭后恢复页面原本的背景（不是统一改成透明）',
   },
+  { key: 'imageBlackBackground', type: 'toggle', label: '图片背景黑色', hint: '仅将已打开图文作品的图片浏览区域背景设为纯黑，关闭后恢复原样' },
   { key: 'idleThrottle', type: 'toggle', label: '暂停时降频', hint: '视频暂停或缓冲时降低采样频率' },
   { key: 'detectBakedInBars', type: 'toggle', label: '裁剪黑边', hint: '忽略视频内嵌的黑边，避免光晕发灰' },
   { key: 'transparentAncestors', type: 'toggle', label: '透传页面背景', hint: '把视频容器的背景设为透明，让光晕透出来' },

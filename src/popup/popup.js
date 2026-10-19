@@ -20,7 +20,7 @@ import { createSettingsUI } from '../options/settings-ui.js';
  */
 const POPUP_TABS = Object.freeze({
   glow: ['blur', 'intensity', 'spread', 'smoothness', 'edgeFocus'],
-  more: ['samplingFps', 'fullPageBackground', 'pureBlackBackground'],
+  more: ['samplingFps', 'fullPageBackground', 'pureBlackBackground', 'imageBlackBackground'],
 });
 
 async function main() {

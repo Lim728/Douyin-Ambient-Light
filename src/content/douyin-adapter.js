@@ -15,6 +15,7 @@
  * background overrides that are fully removed when the extension is switched off.
  */
 
+import { ImageBackground, IMAGE_ROOT_SELECTOR } from './image-background.js';
 import { PLAYER_CONTAINER_SELECTORS, findContainer, findVideos, selectBestVideo } from './video-detector.js';
 import { createLogger, debounce, throttle } from '../shared/utils.js';
 
@@ -72,6 +73,7 @@ export class DouyinAmbientAdapter {
     this.document = dependencies.document ?? globalThis.document;
     this.window = dependencies.window ?? this.document?.defaultView ?? globalThis;
 
+    this.imageBackground = new ImageBackground(this.document);
     this.video = null;
     this.container = null;
     this.videoCount = 0;
@@ -135,11 +137,16 @@ export class DouyinAmbientAdapter {
   startObservers() {
     const target = this.document.documentElement;
     if (!target || typeof MutationObserver !== 'function') return;
-    // childList only: Douyin mutates attributes constantly (progress bars), and those
-    // mutations are irrelevant here. The callback itself is debounced, so a burst of DOM
-    // churn costs one detection pass instead of hundreds.
-    this.mutationObserver = new MutationObserver(() => this.scheduleUpdate());
-    this.mutationObserver.observe(target, { childList: true, subtree: true });
+    // Keep the global observation child-list-only. Image-specific attributes are
+    // observed on the note subtree and its ancestors only while that option is on.
+    this.mutationObserver = new MutationObserver((records) => {
+      if (this.settings.imageBlackBackground) {
+        this.observeImageRoots();
+        this.imageBackground.sync(true);
+      }
+      if (records.some(record => record.type === 'childList')) this.scheduleUpdate();
+    });
+    this.observeImageRoots();
 
     if (typeof ResizeObserver === 'function') {
       this.resizeObserver = new ResizeObserver(() => {
@@ -148,6 +155,27 @@ export class DouyinAmbientAdapter {
       });
       this.resizeObserver.observe(target);
     }
+  }
+
+  observeImageRoots() {
+    if (!this.mutationObserver) return;
+    const roots = this.settings.imageBlackBackground
+      ? [...this.document.querySelectorAll(IMAGE_ROOT_SELECTOR)] : [];
+    const targets = new Set();
+    for (const root of roots) {
+      for (let node = root; node && node !== this.document.documentElement; node = node.parentElement) targets.add(node);
+    }
+    const previous = this.imageObservationTargets;
+    if (previous && previous.size === targets.size && [...targets].every(node => previous.has(node))) return;
+    this.mutationObserver.disconnect();
+    this.mutationObserver.observe(this.document.documentElement, { childList: true, subtree: true });
+    for (const node of targets) {
+      this.mutationObserver.observe(node, {
+        attributes: true, attributeFilter: ['hidden', 'aria-hidden', 'class', 'style', 'src'],
+        subtree: roots.includes(node),
+      });
+    }
+    this.imageObservationTargets = targets;
   }
 
   handleNavigation = () => this.update('navigation');
@@ -181,6 +209,8 @@ export class DouyinAmbientAdapter {
     if (this.destroyed) return;
     this.lastReason = reason;
     const settings = this.settings;
+    this.observeImageRoots();
+    this.imageBackground.sync(settings.imageBlackBackground);
     if (!settings.enabled && !settings.pureBlackBackground) {
       this.deactivate();
       return;
@@ -608,11 +638,13 @@ export class DouyinAmbientAdapter {
 
   destroy() {
     this.destroyed = true;
+    this.imageBackground.clear();
     if (this.pollTimer) clearInterval(this.pollTimer);
     this.pollTimer = 0;
     this.mutationObserver?.disconnect();
     this.resizeObserver?.disconnect();
     this.mutationObserver = null;
+    this.imageObservationTargets?.clear();
     this.resizeObserver = null;
     this.scheduleUpdate.cancel();
     this.scheduleMediaUpdate.cancel();

@@ -638,7 +638,7 @@ async function main() {
       moreTab.moreHidden === false &&
         moreTab.glowHidden === true &&
         moreTab.active &&
-        moreTab.fields.join(',') === 'samplingFps,fullPageBackground,pureBlackBackground',
+        moreTab.fields.join(',') === 'samplingFps,fullPageBackground,pureBlackBackground,imageBlackBackground',
       JSON.stringify(moreTab)
     );
 
@@ -654,7 +654,7 @@ async function main() {
     });
     check(
       'popup exposes the pure black background toggle (off by default)',
-      pureBlackField.present && pureBlackField.checked === false && pureBlackField.label.includes('纯黑背景'),
+      pureBlackField.present && pureBlackField.checked === false && pureBlackField.label.includes('视频背景黑色'),
       JSON.stringify(pureBlackField)
     );
 
@@ -898,6 +898,83 @@ async function main() {
       gone.videos === 0 && gone.rootAttribute === null && !gone.hasRoot && gone.cleared === 0,
       JSON.stringify(gone)
     );
+
+    // Observed note-detail carousel structure, exercised through the real extension.
+    await popup.click('.dal-tab[data-tab="more"]');
+    const imageSwitch = popup.locator('[data-key="imageBlackBackground"] input');
+    check('image background switch is labelled and defaults off',
+      !(await imageSwitch.isChecked()) && (await popup.locator('.dal-field[data-key="imageBlackBackground"]').innerText()).includes('图片背景黑色'));
+    await popup.click('[data-key="imageBlackBackground"] .dal-switch-track');
+    await sleep(600);
+    await popup.reload();
+    check('image background preference survives popup reload', await popup.locator('[data-key="imageBlackBackground"] input').isChecked());
+    await setSettings({ enabled: false, pureBlackBackground: true });
+    await page.evaluate(() => {
+      history.pushState({}, '', '/note/123');
+      const viewer = document.createElement('section');
+      viewer.id = 'image-test'; viewer.className = 'note-detail-container';
+      viewer.innerHTML = '<div class="focusPanel" style="position:fixed;top:80px;left:200px;width:600px;height:500px;background-color:rgb(30,30,30)"><div class="dySwiperSlide"><div style="position:relative;z-index:0"><img alt="original" style="width:300px;height:400px" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"><div class="test-backdrop" style="position:absolute;z-index:-1"><img style="filter:blur(60px)" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"></div></div></div></div><aside style="background-color:red">comments</aside>';
+      document.body.append(viewer);
+    });
+    await page.waitForFunction(() => document.querySelector('#image-test .focusPanel')?.style.backgroundColor === 'rgb(0, 0, 0)');
+    const imageState = await page.evaluate(() => ({
+      foreground: document.querySelector('#image-test img').getAttribute('style'),
+      backdrop: document.querySelector('.test-backdrop').style.visibility,
+      comments: document.querySelector('#image-test aside').style.backgroundColor,
+      glow: Boolean(document.querySelector('.dal-root')),
+    }));
+    check('image background works independently and preserves original image and comments',
+      !imageState.glow && imageState.backdrop === 'hidden' && imageState.comments === 'red' && imageState.foreground === 'width:300px;height:400px', JSON.stringify(imageState));
+    await page.evaluate(() => { document.querySelector('#image-test').hidden = true; });
+    await page.waitForFunction(() => document.querySelector('#image-test .focusPanel').style.backgroundColor === 'rgb(30, 30, 30)');
+    check('closing an image viewer restores its background without waiting for polling', true);
+    await page.evaluate(() => { document.querySelector('#image-test').hidden = false; });
+    await page.waitForFunction(() => document.querySelector('#image-test .focusPanel').style.backgroundColor === 'rgb(0, 0, 0)');
+    await setSettings({ imageBlackBackground: false });
+    await page.waitForFunction(() => document.querySelector('#image-test .focusPanel').style.backgroundColor === 'rgb(30, 30, 30)');
+    check('disabling image background restores the original appearance', true);
+
+    // Real profile modal diagnostics: no note-detail ancestor; fractional viewport
+    // width; original image and a scaled, blurred duplicate in a negative-z DIV.
+    await page.evaluate(() => {
+      history.pushState({}, '', '/user/example?modal_id=123');
+      const viewer = document.querySelector('#image-test');
+      viewer.className = 'basePlayerContainer modalPlayer';
+      const panel = viewer.querySelector('.focusPanel');
+      panel.style.cssText = 'position:fixed;top:0;left:0;width:calc(100vw + 0.3px);height:100vh;overflow:hidden;background-color:rgb(30,30,30)';
+      const slide = panel.querySelector('.dySwiperSlide');
+      const track = document.createElement('div'); track.className = 'test-track'; track.style.display = 'flex';
+      panel.append(track); track.append(slide);
+      const button = document.createElement('button'); button.textContent = 'carousel control'; slide.prepend(button);
+      slide.style.cssText = 'flex:0 0 100%;position:relative';
+      slide.querySelector('.test-backdrop').style.transform = 'scale(1.2)';
+      track.append(slide.cloneNode(true), slide.cloneNode(true));
+      [...track.children].forEach((item, index) => {
+        item.querySelector('img').style.cssText = ['width:270px;height:480px', 'width:640px;height:360px', 'width:400px;height:400px'][index];
+      });
+    });
+    const originals = await page.locator('#image-test .dySwiperSlide > div > img').evaluateAll(images => images.map(img => img.outerHTML));
+    await setSettings({ imageBlackBackground: true });
+    await page.waitForFunction(() => [...document.querySelectorAll('#image-test .test-backdrop')].every(el => getComputedStyle(el).visibility === 'hidden'));
+    check('profile modal with fractional viewport width blacks the image region',
+      await page.locator('#image-test .focusPanel').evaluate(el => getComputedStyle(el).backgroundColor === 'rgb(0, 0, 0)'));
+    for (const offset of [0, -100, -200]) {
+      await page.locator('#image-test .test-track').evaluate((el, value) => { el.style.transform = `translateX(${value}%)`; }, offset);
+      await sleep(100);
+    }
+    await page.setViewportSize({ width: 1000, height: 700 });
+    await sleep(500);
+    const afterCarousel = await page.locator('#image-test .dySwiperSlide > div > img').evaluateAll(images => images.map(img => img.outerHTML));
+    check('portrait landscape and square originals survive carousel and resize unchanged', JSON.stringify(originals) === JSON.stringify(afterCarousel));
+    check('modal carousel controls and comments remain visible', await page.locator('#image-test button').first().evaluate(el => getComputedStyle(el).visibility === 'visible') && await page.locator('#image-test aside').evaluate(el => el.style.backgroundColor === 'red'));
+    await setSettings({ imageBlackBackground: false });
+    await page.waitForFunction(() => [...document.querySelectorAll('#image-test .test-backdrop')].every(el => el.style.visibility === ''));
+    check('modal toggle off restores blur containers and original background', await page.locator('#image-test .focusPanel').evaluate(el => el.style.backgroundColor === 'rgb(30, 30, 30)'));
+    await setSettings({ imageBlackBackground: true });
+    await page.waitForFunction(() => document.querySelector('#image-test .test-backdrop').style.visibility === 'hidden');
+    await page.evaluate(() => { history.pushState({}, '', '/user/example'); window.dispatchEvent(new PopStateEvent('popstate')); });
+    await page.waitForFunction(() => document.querySelector('#image-test .test-backdrop').style.visibility === '');
+    check('returning to profile releases modal background styles', await page.locator('#image-test .focusPanel').evaluate(el => el.style.backgroundColor === 'rgb(30, 30, 30)'));
 
     check('no console errors', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | '));
   } finally {
